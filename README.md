@@ -43,6 +43,9 @@ Neste projeto, após o treino do K-means:
 - Marcamos como suspeitos os casos no top X% de maior distância.
 - Comparamos com `is_fraud` apenas para cálculo de **precision** e **recall** (sem vazamento de informação no modelo).
 
+# Por que ustilizamos 3 clusters?
+
+Mesmo sendo um problema binário (fraude vs. não fraude), o **K-Means** não “aprende” essas duas classes: ele apenas particiona as transações em k grupos pelo centróide mais próximo e minimiza a variância dentro de cada cluster, então k não precisa ser igual (e muitas vezes não é) ao número de classes do alvo . Quando você usa k = 2, pode forçar vários perfis legítimos diferentes se agruparem em só dois centróides, o que tende a aumentar a dispersão/variância dentro dos clusters e deixar muitas transações normais com distância alta ao centróide; como a regra marca “suspeito” pelo top x% de distância, isso aumenta falsos positivos e reduz a precisão. Com k = 3, o modelo consegue separar melhor subgrupos de comportamento normal, reduzindo a variância intra-cluster e tornando a distância ao centróide um escore mais discriminativo, de forma que os pontos realmente atípicos (onde fraudes tendem a cair) ficam mais concentrados no topo das distâncias, elevando a precisão.
 ---
 
 ## Estrutura do Código
@@ -98,10 +101,14 @@ O script principal do Streamlit segue a seguinte lógica:
      - total de transações,
      - número de suspeitos,
      - distância média,
-     - p95 da distância,
+     - percentil 95 da distância,
      - percentual de suspeitos.
 
 ---
+
+## Link da Base de dados (fictícia)
+
+https://www.kaggle.com/datasets/umitka/synthetic-financial-fraud-dataset
 
 ## Rodar arquivo app.py
 
@@ -116,3 +123,4 @@ pip install pandas==2.1.0
 pip install numpy==1.24.3
 pip install matplotlib==3.7.2
 pip install scikit-learn==1.3.0
+

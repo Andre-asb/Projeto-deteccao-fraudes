@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+from matplotlib.lines import Line2D
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -109,18 +109,49 @@ fig, axes = plt.subplots(2, 3, figsize=(24, 12))
 pca = PCA(n_components=2, random_state=42)
 X_pca = pca.fit_transform(X_scaled)
 
+def comentarios(ax, txt, y=-0.22):
+    ax.text(
+        0.5, y, txt,
+        transform=ax.transAxes,
+        ha="center", va="top",
+        fontsize=12, wrap=True
+    )
+
+
 # (1) PCA: suspeitos em vermelho, normais em azul
 colors = np.where(df["kmeans_suspeito"].values == 1, "red", "lightblue")
-axes[0, 0].scatter(X_pca[:, 0], X_pca[:, 1], c=colors, alpha=0.7, s=25)
+
+sc_base = axes[0, 0].scatter(
+    X_pca[:, 0], X_pca[:, 1],
+    c=colors, alpha=0.7, s=25
+)
 
 # Fraudes reais como X preto (apenas visualização / avaliação)
-axes[0, 0].scatter(
+sc_fraudes = axes[0, 0].scatter(
     X_pca[df["is_fraud"] == 1, 0],
     X_pca[df["is_fraud"] == 1, 1],
-    c="black", s=200, marker="X", label=f"Fraudes reais ({fraudes_total})"
+    c="black", s=200, marker="X",
+    label=f"Fraudes reais ({fraudes_total})"
 )
-axes[0, 0].set_title("Suspeitos (distância) + Fraudes reais")
-axes[0, 0].legend()
+
+# Legenda manual para cores do scatter (azul = normal, vermelho = suspeito)
+legend_elements = [
+    Line2D([0], [0], marker='o', color='w', label='Normal',
+            markerfacecolor='lightblue', markersize=10, alpha=0.7),
+    Line2D([0], [0], marker='o', color='w', label='Suspeitos detectados dentro dos normais',
+            markerfacecolor='red', markersize=10, alpha=0.7),
+    Line2D([0], [0], marker='X', color='w', label=f'Fraudes reais ({fraudes_total})',
+            markerfacecolor='black', markeredgecolor='black', markersize=12),
+]
+
+axes[0, 0].set_title("Suspeitos + Fraudes reais")
+axes[0, 0].legend(handles=legend_elements, loc="best")
+
+comentarios(
+    axes[0, 0],
+    "Análise das transações. Cada ponto no gráfico refere-se a uma transação."
+)
+
 
 # (2) Centros dos clusters no PCA
 centros_pca = pca.transform(kmeans.cluster_centers_)
@@ -130,6 +161,11 @@ axes[0, 1].set_title(f"Centros dos {k_clusters} clusters")
 legend1 = axes[0, 1].legend(*scatter2.legend_elements(), title="Cluster")
 axes[0, 1].add_artist(legend1)
 
+comentarios(
+    axes[0, 1],
+    "PCA colorido por cluster do KMeans. Cada cor é um cluster; \n o X vermelho é o centróide do cluster no PCA."
+)
+
 # (3) Histograma de distâncias + limiar
 axes[0, 2].hist(df[df["kmeans_suspeito"] == 1]["dist_centroid"], bins=20, alpha=0.8, color="red",
                 label=f"Suspeitos ({len(suspeitos)})")
@@ -138,11 +174,23 @@ axes[0, 2].axvline(limiar_dist, color="orange", linestyle="--", label=f"Top {per
 axes[0, 2].set_title("Distância ao centróide (limiar)")
 axes[0, 2].legend()
 
+comentarios(
+    axes[0, 2],
+    "Centróide dos clusteres. Define a distância limite (4,05) \n para o modelo marcar a transação como suspeita."
+)
+
 # (4) Tamanho dos clusters (sem usar is_fraud)
 cluster_sizes = df["cluster"].value_counts().sort_index()
 axes[1, 0].bar(cluster_sizes.index.astype(str), cluster_sizes.values, color="steelblue")
-axes[1, 0].set_title("Tamanho por cluster")
+axes[1, 0].set_title("Volume de transações por cluster.")
 axes[1, 0].set_ylabel("Qtd transações")
+axes[1, 0].set_xlabel("Clusters")
+
+
+comentarios(
+    axes[1, 0],
+    "Volume de transações por cluster. Ajuda a ver \n se algum cluster concentra a maior parte do tráfego."
+)
 
 # (5) Distância vs fraude real (apenas para avaliar)
 axes[1, 1].scatter(df["dist_centroid"], df["is_fraud"], alpha=0.6, s=30)
@@ -151,14 +199,19 @@ axes[1, 1].set_title("Distância vs Fraude real (avaliação)")
 axes[1, 1].set_xlabel("Distância ao centróide")
 axes[1, 1].set_ylabel("is_fraud")
 
-# (6) NOVO GRÁFICO: Fraudes reais vs suspeitos por cluster
+comentarios(
+    axes[1, 1],
+    " A linha tracejada marca o valor 4,05. Acima desse valor, \n vê-se que a transação tem alta probabilidade de ser Fraude."
+)
+
+# (6) Fraudes reais vs suspeitos por cluster
 cluster_fraud_summary = (
     df.groupby("cluster")
-      .agg(
-          fraudes_reais=("is_fraud", "sum"),
-          suspeitos=("kmeans_suspeito", "sum")
-      )
-      .reset_index()
+        .agg(
+            fraudes_reais=("is_fraud", "sum"),
+            suspeitos=("kmeans_suspeito", "sum")
+        )
+        .reset_index()
 )
 
 x = np.arange(len(cluster_fraud_summary["cluster"]))
@@ -173,8 +226,14 @@ axes[1, 2].set_xlabel("Cluster")
 axes[1, 2].set_ylabel("Quantidade")
 axes[1, 2].legend()
 
-plt.tight_layout()
+comentarios(
+    axes[1, 2],
+    "Visualização da captura de fraudes. \n Comparação por cluster: preto = fraudes reais, vermelho = suspeitos do KMeans."
+)
+
+plt.tight_layout(pad=1.2, h_pad=2.0, w_pad=1.0)
 st.pyplot(fig)
+
 
 # =========================
 # 9) TABELA FINAL
@@ -184,7 +243,7 @@ top_suspeitos = df[df["kmeans_suspeito"] == 1].nlargest(200, "dist_centroid")
 st.dataframe(
     top_suspeitos[
         ["transaction_id", "user_id", "amount", "merchant_category", "hour",
-         "risco_medio", "dist_centroid", "cluster", "is_fraud"]
+            "risco_medio", "dist_centroid", "cluster", "is_fraud"]
     ].round(3)
 )
 
@@ -192,13 +251,13 @@ st.header("Quantidades por cluster")
 
 cluster_qtd = (
     df.groupby("cluster")
-      .agg(
-          total_transacoes=("transaction_id", "count"),
-          suspeitos=("kmeans_suspeito", "sum"),
-          dist_media=("dist_centroid", "mean"),
-          dist_p95=("dist_centroid", lambda s: float(np.quantile(s, 0.95)))
-      )
-      .reset_index()
+        .agg(
+            total_transacoes=("transaction_id", "count"),
+            suspeitos=("kmeans_suspeito", "sum"),
+            dist_media=("dist_centroid", "mean"),
+            dist_percentil95=("dist_centroid", lambda s: float(np.quantile(s, 0.95)))
+        )
+        .reset_index()
 )
 
 cluster_qtd["pct_suspeitos"] = (
